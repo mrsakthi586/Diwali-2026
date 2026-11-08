@@ -1,0 +1,105 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#050713">
+
+    <meta name="description"
+          content="Celebrate Diwali with a spectacular interactive fireworks experience.">
+
+    <title>Festival of Lights</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%23050713'/%3E%3Cpath d='M50 12 C25 42 45 48 50 48 C65 42 70 28 50 12Z' fill='%23FFD166'/%3E%3Cpath d='M18 55 Q50 42 82 55 L72 78 Q50 90 28 78Z' fill='%23D98232'/%3E%3Cellipse cx='50' cy='56' rx='31' ry='5' fill='%23FFF0B0'/%3E%3C/svg%3E">
+</head>
+
+<body>
+
+    <!-- Fireworks animation -->
+    <canvas id="sky"></canvas>
+
+    <!-- SCREEN 1: Welcome -->
+    <section id="welcome" class="screen welcome">
+
+        <div class="welcome-content">
+
+            <div class="welcome-icon">🪔</div>
+
+            <p class="small-label">
+                THE FESTIVAL OF LIGHTS
+            </p>
+
+            <p class="welcome-description">
+                A little light. A lot of happiness.
+            </p>
+
+            <button id="startBtn" class="start-btn">
+                🪔 Let's Celebrate This Festival
+                <span>✦</span>
+            </button>
+
+            <p class="welcome-note">
+                Get ready for a magical night!
+            </p>
+
+        </div>
+
+    </section>
+
+
+    <!-- SCREEN 2: Fireworks celebration -->
+    <section id="celebration" class="screen celebration hidden">
+
+        <div class="celebration-content">
+
+            <p class="reveal-label">
+                THE FESTIVAL OF LIGHTS
+            </p>
+
+            <h1 id="happyTitle">
+                Happy Diwali!
+            </h1>
+
+            <h2 id="revealMessage">
+                Let this Diwali light up the darkness.
+            </h2>
+
+            <p class="reveal-subtitle">
+                May happiness, prosperity and light fill every heart.
+            </p>
+
+            <div class="celebration-divider">
+                ✦ &nbsp; ✨ &nbsp; ✦
+            </div>
+
+            <p class="tap-hint">
+                Tap anywhere in the sky to launch fireworks!
+            </p>
+
+        </div>
+
+
+        <!-- Minimal bottom decorations -->
+        <div class="bottom-diyas" aria-hidden="true">
+            <span>🪔</span>
+            <span>🪔</span>
+            <span>🪔</span>
+            <span>🪔</span>
+            <span>🪔</span>
+        </div>
+
+
+        <footer>
+            Made with <span>♥</span> by Sakthi
+        </footer>
+
+    </section>
+
+
+    <script src="script.js"></script>
+
+</body>
+</html>
