@@ -14,7 +14,7 @@ const startBtn = document.getElementById("startBtn");
 
 const mobile = window.innerWidth < 700;
 
-const MAX_PARTICLES = mobile ? 500 : 950;
+const MAX_PARTICLES = mobile ? 700 : 1400;
 
 const COLORS = [
     "#ff3030",
