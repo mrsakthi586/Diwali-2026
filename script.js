@@ -2,7 +2,7 @@
 "use strict";
 
 /* ==========================================
-   VIRTUAL DIWALI — FIREWORKS ENGINE
+   DIWALI NIGHT — CINEMATIC FIREWORKS
 ========================================== */
 
 const canvas = document.getElementById("sky");
@@ -12,9 +12,9 @@ const welcome = document.getElementById("welcome");
 const celebration = document.getElementById("celebration");
 const startBtn = document.getElementById("startBtn");
 
-const mobile = window.innerWidth < 700;
+const isMobile = () => window.innerWidth < 700;
 
-const MAX_PARTICLES = mobile ? 700 : 1400;
+const MAX_PARTICLES = 1400;
 
 const COLORS = [
     "#ff3030",
@@ -26,7 +26,9 @@ const COLORS = [
     "#54ff70",
     "#ffffff",
     "#ff6b35",
-    "#00ffc8"
+    "#00ffc8",
+    "#ff80ab",
+    "#b8fffa"
 ];
 
 const random = (min, max) =>
@@ -49,10 +51,10 @@ let rockets = [];
 let stars = [];
 
 let audioContext = null;
+let masterGain = null;
 
 let started = false;
 let lastTime = 0;
-
 let nextAutoFirework = 0;
 
 
@@ -64,7 +66,7 @@ function resizeCanvas() {
 
     dpr = Math.min(
         window.devicePixelRatio || 1,
-        mobile ? 1.3 : 1.6
+        isMobile() ? 1.3 : 1.6
     );
 
     width = window.innerWidth;
@@ -76,11 +78,7 @@ function resizeCanvas() {
     canvas.style.width = width + "px";
     canvas.style.height = height + "px";
 
-    ctx.setTransform(
-        dpr, 0,
-        0, dpr,
-        0, 0
-    );
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     stars = Array.from(
         {
@@ -92,7 +90,7 @@ function resizeCanvas() {
         () => ({
             x: random(0, width),
             y: random(0, height),
-            radius: random(.4, 1.2),
+            radius: random(.4, 1.3),
             alpha: random(.2, .7)
         })
     );
@@ -115,11 +113,20 @@ function getAudio() {
 
     if (!audioContext) {
 
-        audioContext = new (
+        const AudioContextClass =
             window.AudioContext ||
-            window.webkitAudioContext
-        )();
+            window.webkitAudioContext;
 
+        if (!AudioContextClass) return null;
+
+        audioContext = new AudioContextClass();
+
+        masterGain = audioContext.createGain();
+
+        // Comfortable overall sound level
+        masterGain.gain.value = 0.65;
+
+        masterGain.connect(audioContext.destination);
     }
 
     if (audioContext.state === "suspended") {
@@ -130,149 +137,276 @@ function getAudio() {
 }
 
 
-/* Rocket launch whistle */
+/* ==========================================
+   AUDIO HELPER — NOISE GENERATOR
+========================================== */
+
+function createNoise(audio, duration) {
+
+    const length = Math.floor(
+        audio.sampleRate * duration
+    );
+
+    const buffer = audio.createBuffer(
+        1,
+        length,
+        audio.sampleRate
+    );
+
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < length; i++) {
+
+        // Slightly softened noise
+        data[i] = (Math.random() * 2 - 1) * 0.7;
+
+    }
+
+    return buffer;
+}
+
+
+/* ==========================================
+   REALISTIC-STYLE ROCKET LAUNCH
+========================================== */
 
 function rocketSound() {
 
     try {
 
         const audio = getAudio();
+
+        if (!audio) return;
+
         const now = audio.currentTime;
 
-        const oscillator = audio.createOscillator();
-        const gain = audio.createGain();
+        /* ----------------------------------
+           1. IGNITION — Short deep burst
+        ---------------------------------- */
 
-        const filter = audio.createBiquadFilter();
+        const ignition = audio.createOscillator();
+        const ignitionGain = audio.createGain();
 
-        oscillator.type = "sawtooth";
+        ignition.type = "triangle";
 
-        oscillator.frequency.setValueAtTime(
-            130, now
+        ignition.frequency.setValueAtTime(90, now);
+
+        ignition.frequency.exponentialRampToValueAtTime(
+            42,
+            now + 0.18
         );
 
-        oscillator.frequency.exponentialRampToValueAtTime(
-            1100, now + .6
+        ignitionGain.gain.setValueAtTime(0.001, now);
+
+        ignitionGain.gain.linearRampToValueAtTime(
+            0.14,
+            now + 0.025
         );
 
-        oscillator.frequency.exponentialRampToValueAtTime(
-            420, now + .9
+        ignitionGain.gain.exponentialRampToValueAtTime(
+            0.001,
+            now + 0.24
         );
 
-        filter.type = "lowpass";
-        filter.frequency.value = 1600;
+        ignition.connect(ignitionGain);
+        ignitionGain.connect(masterGain);
 
-        gain.gain.setValueAtTime(.001, now);
+        ignition.start(now);
+        ignition.stop(now + 0.26);
 
-        gain.gain.linearRampToValueAtTime(
-            .13, now + .08
+
+        /* ----------------------------------
+           2. ROCKET RUSH — Smooth noise
+        ---------------------------------- */
+
+        const duration = 0.95;
+
+        const noise = audio.createBufferSource();
+
+        noise.buffer = createNoise(audio, duration);
+
+        const noiseFilter = audio.createBiquadFilter();
+
+        noiseFilter.type = "lowpass";
+
+        noiseFilter.frequency.setValueAtTime(
+            450,
+            now
         );
 
-        gain.gain.exponentialRampToValueAtTime(
-            .001, now + .95
+        noiseFilter.frequency.exponentialRampToValueAtTime(
+            1800,
+            now + 0.7
         );
 
-        oscillator.connect(filter);
-        filter.connect(gain);
-        gain.connect(audio.destination);
+        noiseFilter.Q.value = 0.6;
 
-        oscillator.start(now);
-        oscillator.stop(now + .98);
+        const noiseGain = audio.createGain();
+
+        noiseGain.gain.setValueAtTime(0.001, now);
+
+        noiseGain.gain.linearRampToValueAtTime(
+            0.10,
+            now + 0.18
+        );
+
+        noiseGain.gain.setValueAtTime(
+            0.08,
+            now + 0.55
+        );
+
+        noiseGain.gain.exponentialRampToValueAtTime(
+            0.001,
+            now + duration
+        );
+
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(masterGain);
+
+        noise.start(now);
+        noise.stop(now + duration);
+
+
+        /* ----------------------------------
+           3. SOFT WHISTLE — Smooth rising tone
+        ---------------------------------- */
+
+        const whistle = audio.createOscillator();
+
+        const whistleFilter = audio.createBiquadFilter();
+        const whistleGain = audio.createGain();
+
+        whistle.type = "sine";
+
+        whistle.frequency.setValueAtTime(
+            280,
+            now + 0.12
+        );
+
+        whistle.frequency.exponentialRampToValueAtTime(
+            750,
+            now + 0.8
+        );
+
+        whistleFilter.type = "lowpass";
+        whistleFilter.frequency.value = 1000;
+
+        whistleGain.gain.setValueAtTime(
+            0.001,
+            now
+        );
+
+        whistleGain.gain.linearRampToValueAtTime(
+            0.025,
+            now + 0.3
+        );
+
+        whistleGain.gain.exponentialRampToValueAtTime(
+            0.001,
+            now + 0.9
+        );
+
+        whistle.connect(whistleFilter);
+        whistleFilter.connect(whistleGain);
+        whistleGain.connect(masterGain);
+
+        whistle.start(now);
+        whistle.stop(now + 0.95);
 
     } catch (error) {
-        console.warn("Rocket audio unavailable", error);
+
+        console.warn("Rocket sound unavailable:", error);
+
     }
 }
 
 
-/* Layered explosion */
+/* ==========================================
+   FIREWORK EXPLOSION SOUND
+========================================== */
 
-function explosionSound(volume = .4) {
+function explosionSound(volume = 0.3) {
 
     try {
 
         const audio = getAudio();
+
+        if (!audio) return;
+
         const now = audio.currentTime;
 
-        // Low-frequency boom
+        /* Deep explosion */
 
         const boom = audio.createOscillator();
         const boomGain = audio.createGain();
 
         boom.type = "sine";
 
-        boom.frequency.setValueAtTime(110, now);
+        boom.frequency.setValueAtTime(85, now);
 
         boom.frequency.exponentialRampToValueAtTime(
-            35, now + .35
+            30,
+            now + 0.4
         );
 
-        boomGain.gain.setValueAtTime(.001, now);
+        boomGain.gain.setValueAtTime(0.001, now);
 
         boomGain.gain.linearRampToValueAtTime(
-            volume * .65, now + .015
+            volume * 0.65,
+            now + 0.025
         );
 
         boomGain.gain.exponentialRampToValueAtTime(
-            .001, now + .4
+            0.001,
+            now + 0.5
         );
 
         boom.connect(boomGain);
-        boomGain.connect(audio.destination);
+        boomGain.connect(masterGain);
 
         boom.start(now);
-        boom.stop(now + .42);
+        boom.stop(now + 0.52);
 
 
-        // Crackling noise
+        /* Soft crackling sparks */
 
-        const duration = .42;
-
-        const buffer = audio.createBuffer(
-            1,
-            Math.floor(audio.sampleRate * duration),
-            audio.sampleRate
-        );
-
-        const data = buffer.getChannelData(0);
-
-        for (let i = 0; i < data.length; i++) {
-            data[i] = Math.random() * 2 - 1;
-        }
+        const duration = 0.38;
 
         const noise = audio.createBufferSource();
-        noise.buffer = buffer;
+
+        noise.buffer = createNoise(audio, duration);
 
         const filter = audio.createBiquadFilter();
 
         filter.type = "lowpass";
-
-        filter.frequency.setValueAtTime(2500, now);
-
-        filter.frequency.exponentialRampToValueAtTime(
-            250, now + duration
-        );
+        filter.frequency.value = 1600;
 
         const noiseGain = audio.createGain();
 
-        noiseGain.gain.setValueAtTime(.001, now);
+        noiseGain.gain.setValueAtTime(0.001, now);
 
         noiseGain.gain.linearRampToValueAtTime(
-            volume * .4, now + .01
+            volume * 0.2,
+            now + 0.02
         );
 
         noiseGain.gain.exponentialRampToValueAtTime(
-            .001, now + duration
+            0.001,
+            now + duration
         );
 
         noise.connect(filter);
         filter.connect(noiseGain);
-        noiseGain.connect(audio.destination);
+        noiseGain.connect(masterGain);
 
         noise.start(now);
         noise.stop(now + duration);
 
     } catch (error) {
-        console.warn("Explosion audio unavailable", error);
+
+        console.warn("Explosion sound unavailable:", error);
+
     }
 }
 
@@ -285,15 +419,13 @@ function addParticle(
     x, y,
     vx, vy,
     color,
-    life = 75,
-    gravity = .045,
-    size = 2,
-    drag = .985
+    life = 100,
+    gravity = 0.035,
+    size = 2.5,
+    drag = 0.991
 ) {
 
-    if (particles.length >= MAX_PARTICLES) {
-        return;
-    }
+    if (particles.length >= MAX_PARTICLES) return;
 
     particles.push({
 
@@ -347,13 +479,16 @@ class Fireworks {
 
 
     explode(
-        x,
-        y,
+        x, y,
         color,
         pattern = "chrysanthemum",
-        count = 90,
-        soundVolume = .35
+        count = 100,
+        soundVolume = 0.3
     ) {
+
+        const explosionSize = isMobile() ? 1.35 : 1.7;
+
+        // Main explosion
 
         for (let i = 0; i < count; i++) {
 
@@ -363,32 +498,34 @@ class Fireworks {
             if (pattern === "ring") {
 
                 angle = i / count * Math.PI * 2;
-                speed = random(3, 5);
+                speed = random(4, 7);
 
             } else if (pattern === "willow") {
 
                 angle = random(0, Math.PI * 2);
-                speed = random(1.5, 4);
+                speed = random(2, 5);
 
             } else if (pattern === "double") {
 
                 angle = i / count * Math.PI * 2;
 
                 speed = i % 2 === 0
-                    ? random(2, 3)
-                    : random(4, 5.5);
+                    ? random(3, 4.5)
+                    : random(5, 7);
 
             } else if (pattern === "palm") {
 
                 angle = random(0, Math.PI * 2);
-                speed = random(3, 5.5);
+                speed = random(4, 7);
 
             } else {
 
                 angle = random(0, Math.PI * 2);
-                speed = random(2, 5);
+                speed = random(3, 7);
 
             }
+
+            speed *= explosionSize;
 
             addParticle(
                 x, y,
@@ -398,22 +535,23 @@ class Fireworks {
 
                 color,
 
-                pattern === "willow" ? 105 : 80,
+                pattern === "willow" ? 125 : 105,
 
-                pattern === "willow" ? .07 : .05,
+                pattern === "willow" ? 0.045 : 0.035,
 
-                random(1.5, 3),
+                random(2, 4),
 
-                .988
+                0.991
             );
         }
 
-        // White inner sparks
 
-        for (let i = 0; i < 15; i++) {
+        // Golden inner sparks
+
+        for (let i = 0; i < 35; i++) {
 
             const angle = random(0, Math.PI * 2);
-            const speed = random(.5, 2);
+            const speed = random(1, 3.5);
 
             addParticle(
                 x, y,
@@ -421,12 +559,34 @@ class Fireworks {
                 Math.cos(angle) * speed,
                 Math.sin(angle) * speed,
 
-                "#fff8dc",
-                25,
-                .035,
+                "#fff2b0",
+                45,
+                0.025,
+                3
+            );
+        }
+
+
+        // Secondary colourful ring
+
+        for (let i = 0; i < 45; i++) {
+
+            const angle = random(0, Math.PI * 2);
+            const speed = random(2, 5) * explosionSize;
+
+            addParticle(
+                x, y,
+
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed,
+
+                pick(COLORS),
+                75,
+                0.04,
                 2.5
             );
         }
+
 
         if (soundVolume > 0) {
             explosionSound(soundVolume);
@@ -445,21 +605,21 @@ class Fireworks {
             const r = rockets[i];
 
             r.y += r.speed * step;
-            r.speed += .12 * step;
+            r.speed += 0.12 * step;
 
             // Rocket tail
 
             addParticle(
-                r.x + random(-1, 1),
+                r.x + random(-1.5, 1.5),
                 r.y + 8,
 
-                random(-.4, .4),
-                random(1, 2),
+                random(-0.6, 0.6),
+                random(1, 2.5),
 
                 r.color,
-                22,
-                .04,
-                1.8
+                30,
+                0.035,
+                2.5
             );
 
             // Rocket head
@@ -467,7 +627,7 @@ class Fireworks {
             ctx.save();
 
             ctx.fillStyle = "#ffffff";
-            ctx.shadowBlur = 20;
+            ctx.shadowBlur = 25;
             ctx.shadowColor = r.color;
 
             ctx.beginPath();
@@ -475,7 +635,7 @@ class Fireworks {
             ctx.arc(
                 r.x,
                 r.y,
-                3.5,
+                4,
                 0,
                 Math.PI * 2
             );
@@ -484,11 +644,12 @@ class Fireworks {
 
             ctx.restore();
 
+
             // Explosion
 
             if (
                 r.y <= r.targetY ||
-                r.speed > -.2
+                r.speed > -0.2
             ) {
 
                 this.explode(
@@ -496,8 +657,8 @@ class Fireworks {
                     r.y,
                     r.color,
                     "chrysanthemum",
-                    mobile ? 90 : 135,
-                    .65
+                    isMobile() ? 160 : 230,
+                    0.35
                 );
 
                 rockets.splice(i, 1);
@@ -536,8 +697,9 @@ class Fireworks {
 
             ctx.strokeStyle = p.color;
             ctx.lineWidth = p.size;
+            ctx.lineCap = "round";
 
-            ctx.shadowBlur = mobile ? 3 : 9;
+            ctx.shadowBlur = isMobile() ? 4 : 13;
             ctx.shadowColor = p.color;
 
             ctx.beginPath();
@@ -546,6 +708,20 @@ class Fireworks {
             ctx.lineTo(p.x, p.y);
 
             ctx.stroke();
+
+            ctx.fillStyle = p.color;
+
+            ctx.beginPath();
+
+            ctx.arc(
+                p.x,
+                p.y,
+                p.size * 0.65,
+                0,
+                Math.PI * 2
+            );
+
+            ctx.fill();
 
             ctx.restore();
 
@@ -574,7 +750,7 @@ function startCelebration() {
 
     started = true;
 
-    // Start audio directly from user interaction
+    // Audio initialized through user interaction
 
     getAudio();
 
@@ -582,44 +758,47 @@ function startCelebration() {
     celebration.classList.remove("hidden");
 
     const centerX = width / 2;
-    const centerY = height * .35;
+    const centerY = height * 0.35;
 
-    // Massive golden explosion
+
+    // MASSIVE GOLDEN EXPLOSION
 
     fireworks.explode(
         centerX,
         centerY,
         "#ffd166",
         "chrysanthemum",
-        mobile ? 150 : 230,
-        .55
+        isMobile() ? 220 : 350,
+        0.35
     );
 
-    // Pink and cyan explosions
+
+    // PINK AND CYAN EXPLOSIONS
 
     setTimeout(() => {
 
         fireworks.explode(
-            centerX - width * .22,
+            centerX - width * 0.22,
             centerY + 35,
             "#ff43a4",
             "ring",
-            mobile ? 65 : 100,
-            .25
+            isMobile() ? 110 : 170,
+            0.15
         );
 
         fireworks.explode(
-            centerX + width * .22,
+            centerX + width * 0.22,
             centerY + 35,
             "#00e5ff",
             "ring",
-            mobile ? 65 : 100,
-            .25
+            isMobile() ? 110 : 170,
+            0.15
         );
 
     }, 350);
 
-    // Golden final explosion
+
+    // GOLDEN FINAL EXPLOSION
 
     setTimeout(() => {
 
@@ -628,15 +807,41 @@ function startCelebration() {
             centerY - 70,
             "#fff2b3",
             "double",
-            mobile ? 100 : 145,
-            .3
+            isMobile() ? 140 : 200,
+            0.2
         );
 
     }, 750);
 
-    // Start automatic fireworks
 
-    nextAutoFirework = performance.now() + 1200;
+    // PURPLE AND GREEN EXPLOSIONS
+
+    setTimeout(() => {
+
+        fireworks.explode(
+            centerX - width * 0.3,
+            centerY - 50,
+            "#a855f7",
+            "palm",
+            isMobile() ? 75 : 120,
+            0.15
+        );
+
+        fireworks.explode(
+            centerX + width * 0.3,
+            centerY - 50,
+            "#54ff70",
+            "willow",
+            isMobile() ? 75 : 120,
+            0.15
+        );
+
+    }, 1200);
+
+
+    // Automatic fireworks
+
+    nextAutoFirework = performance.now() + 1800;
 }
 
 startBtn.addEventListener(
@@ -654,8 +859,8 @@ function launchAt(x, y) {
     if (!started) return;
 
     const targetY = Math.max(
-        height * .12,
-        Math.min(y, height * .65)
+        height * 0.12,
+        Math.min(y, height * 0.65)
     );
 
     fireworks.launch(
@@ -667,20 +872,21 @@ function launchAt(x, y) {
 }
 
 
-/* Click anywhere on the celebration screen */
+/* Click anywhere in the celebration sky */
 
-celebration.addEventListener("pointerdown", event => {
+celebration.addEventListener(
+    "pointerdown",
+    event => {
 
-    if (!started) return;
+        if (!started) return;
 
-    // Avoid accidental firing on text selection
+        launchAt(
+            event.clientX,
+            event.clientY
+        );
 
-    launchAt(
-        event.clientX,
-        event.clientY
-    );
-
-});
+    }
+);
 
 
 /* ==========================================
@@ -693,16 +899,14 @@ function automaticFireworks(time) {
 
     if (time < nextAutoFirework) return;
 
-    // Random launch position
-
     const x = random(
-        width * .15,
-        width * .85
+        width * 0.15,
+        width * 0.85
     );
 
     const targetY = random(
-        height * .12,
-        height * .43
+        height * 0.12,
+        height * 0.43
     );
 
     fireworks.launch(
@@ -712,9 +916,7 @@ function automaticFireworks(time) {
         false
     );
 
-    // Next automatic launch
-
-    nextAutoFirework = time + random(1500, 2800);
+    nextAutoFirework = time + random(1800, 3000);
 }
 
 
@@ -728,8 +930,8 @@ function drawStars(time) {
 
         const alpha =
             star.alpha * (
-                .7 + .3 * Math.sin(
-                    time * .001 + star.x
+                0.7 + 0.3 * Math.sin(
+                    time * 0.001 + star.x
                 )
             );
 
@@ -774,22 +976,14 @@ function animate(time) {
 
     lastTime = time;
 
-    // Clear previous frame
-
     ctx.clearRect(
         0, 0,
         width, height
     );
 
-    // Background stars
-
     drawStars(time);
 
-    // Automatic fireworks
-
     automaticFireworks(time);
-
-    // Update particles and rockets
 
     fireworks.update(dt);
 
@@ -815,6 +1009,10 @@ document.addEventListener(
 );
 
 
+/* ==========================================
+   INITIALIZATION
+========================================== */
+
 console.log(
-    "🪔 Diwali Night — Fireworks Ready!"
+    "🪔 Diwali Night — Smooth Rocket Audio Ready!"
 );
